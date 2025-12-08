@@ -1,0 +1,233 @@
+/* ==========================================================================
+   1. GLOBAL STYLES
+   ========================================================================== */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Open Sans', Roboto, Arial, sans-serif;
+  color: #333;
+  font-size: 13px;
+  /* INVESTIGATE Always show scrollbar track to prevent horizontal layout jump/flicker */
+  overflow-y: scroll; 
+  overflow-x: hidden;
+}
+
+
+/* ==========================================================================
+   2. DASHBOARD & TITLES
+   ========================================================================== */
+.navbar-title {
+  font-size: 1.8em !important;
+  font-weight: 900;
+  padding-top: 5px;
+}
+
+.navbar .nav-link {
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+}
+
+.quarto-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  background: linear-gradient(135deg, #2E7EAA 0%, #41B6C4 100%);
+  color: #fff;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0 0 8px 8px;
+  margin-bottom: 0.5rem;
+}
+
+.quarto-title-block .title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.quarto-title-block .subtitle {
+  display: block;
+  font-size: 0.95rem;
+  margin: 0.2rem 0 0 0;
+  opacity: 0.95;
+}
+
+.dashboard-page {
+  padding: 0.5rem;
+}
+
+
+
+/* Place near the top of newestcss.txt */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   3. CARD SYSTEM & LAYOUT FIXES
+   ========================================================================== */
+.page-rows-contents {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; 
+}
+
+.page-rows-contents > .dashboard-page-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0rem;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.card {
+  margin-bottom: 0;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border: 2px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; 
+}
+
+.card-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0.8rem;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+
+.card-body {
+  padding: 0.6rem 0.8rem;
+  font-size: 1em;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; 
+  overflow: hidden;
+}
+
+/* Target the Quarto/OJS wrappers */
+.card-body > div,
+.cell-output-display,
+.observablehq {
+  /* Allow these containers to grow to fill the card */
+  flex: 1 1 0%; 
+  width: 100%;
+  min-height: 0;
+  /* CRITICAL: Set position relative so absolute children (plots) can pin to this size */
+  position: relative; 
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   4. FILTERS
+   ========================================================================== */
+.filter-card {
+  overflow: visible !important;
+}
+
+.filter-card .card-body {
+  padding: 0.8rem;
+  overflow: visible !important;
+  display: block;
+  height: auto;
+}
+
+.filter-card .observablehq {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+  flex: none; /* Don't stretch filters */
+  height: auto !important; 
+}
+
+/* Hide debug tools */
+.observablehq--inspect,
+.observablehq--toggle,
+button[aria-label*="expand"],
+button[aria-label*="collapse"] {
+  display: none !important;
+}
+
+form.observablehq-form {
+  font-size: 0.85rem;
+  width: 100%;
+  padding: 0;
+}
+
+form.observablehq-form label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   5. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 992px) {
+  .quarto-title-block .title { font-size: 1.4rem; }
+  .card-header { font-size: 0.85rem; padding: 0.35rem 0.6rem; }
+  .card-body { padding: 0.4rem 0.6rem; }
+}
+
+@media (max-width: 768px) {
+  body { font-size: 12px; }
+  .quarto-title-block .title { font-size: 1.2rem; }
+}
+
+@media print {
+  .dashboard-nav, .dataTables_filter { display: none !important; }
+  .card { break-inside: avoid; margin-bottom: 0.5rem; }
+}
+
+/* ==========================================================================
+   6. CLEANUP
+   ========================================================================== */
+.card-body .cell-output-display,
+.card-body .observablehq,
+.card .cell,
+.card .cell-output {
+  border: none;
+  box-shadow: none;
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.quarto-title-block img {
+  max-height: 40px;
+}
+
+.card[data-full-screen="false"]:hover > * > .bslib-full-screen-enter {
+  display: none;
+}
+
+.card .observablehq--toggle,
+.card button[aria-label*="expand"],
+.card button[aria-label*="collapse"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+
+.card-body > div,
+.card-body .cell-output-display,
+.card-body .observablehq {
+  max-width: 100%;
+}
+

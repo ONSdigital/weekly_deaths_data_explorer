@@ -1,0 +1,654 @@
+---
+title: "Weekly Deaths In England and Wales: Provisional Death Registrations & Occurrences"
+date: today
+format:
+  dashboard:
+    theme: cosmo
+    css: styling.css
+    orientation: rows
+    scrolling: true
+    logo: logo.svg
+    embed-resources: true
+    self-contained: true
+include-in-header:
+  - text: |
+      <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;900&display=swap" rel="stylesheet">
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(janitor)
+library(readr)
+
+# published weekly deaths file
+file_path <- "weeklydeathsweek422025.xlsx"
+
+# imports and cleaning
+
+df1 <- read_excel(file_path, sheet = "Table_1", skip = 5) %>%
+  clean_names() %>%
+  filter(!is.na(week_number)) %>%
+  mutate(
+    week_number = as.integer(week_number),
+    week_ending = dmy(week_ending),
+    number_of_deaths = parse_number(as.character(number_of_deaths)),
+    year = lubridate::year(week_ending),
+    series = "Registrations"
+  ) %>%
+  filter(!is.na(week_ending), !is.na(number_of_deaths)) %>%
+  filter(year >= 2025)
+
+df2 <- read_excel(file_path, sheet = "Table_2", skip = 6) %>%
+  clean_names() %>%
+  filter(!is.na(week_number)) %>%
+  mutate(
+    week_number = as.integer(week_number),
+    week_ending = dmy(week_ending),
+    number_of_deaths = parse_number(as.character(number_of_deaths)),
+    series = "Occurrences"
+  ) %>%
+  filter(!is.na(week_ending), !is.na(number_of_deaths)) %>%
+  filter(year >= 2025)
+
+regions <- c(
+  "North East", "North West", "Yorkshire and The Humber", "East Midlands",
+  "West Midlands", "East of England", "London", "South East", "South West", "Wales"
+)
+
+# combine everything
+combined_raw <- bind_rows(df1, df2) %>%
+  select(
+    year, week_number, week_ending, area_of_usual_residence, sex,
+    age_group_years, imd_quantile_group, place_of_occurrence,
+    number_of_deaths, series
+  )
+
+# create detailed data with age bands
+
+detailed_data <- combined_raw %>%
+  filter(
+    age_group_years != "All ages",
+    sex %in% c("Male", "Female"),
+    area_of_usual_residence %in% regions,
+    imd_quantile_group == "All groups",
+    place_of_occurrence == "All places"
+  ) %>%
+  mutate(
+    age_band = case_when(
+      age_group_years %in% c("Under 1","1 to 4","5 to 9","10 to 14") ~ "0-14 years",
+      age_group_years %in% c("15 to 19","20 to 24","25 to 29","30 to 34","35 to 39","40 to 44") ~ "15-44 years",
+      age_group_years %in% c("45 to 49","50 to 54","55 to 59","60 to 64") ~ "45-64 years",
+      age_group_years %in% c("65 to 69","70 to 74") ~ "65-74 years",
+      age_group_years %in% c("75 to 79","80 to 84") ~ "75-84 years",
+      TRUE ~ "85+ years"
+    ),
+    age_order = case_when(
+      age_band == "0-14 years" ~ 1,
+      age_band == "15-44 years" ~ 2,
+      age_band == "45-64 years" ~ 3,
+      age_band == "65-74 years" ~ 4,
+      age_band == "75-84 years" ~ 5,
+      age_band == "85+ years" ~ 6
+    )
+  ) %>%
+  group_by(series, week_ending, week_number, area_of_usual_residence, sex, age_band, age_order) %>%
+  summarise(number_of_deaths = sum(number_of_deaths), .groups = "drop")
+
+# convert dates to string for JSON
+
+detailed_data <- detailed_data %>% mutate(week_ending_str = as.character(week_ending))
+
+# save data for OJS
+
+ojs_define(death_data = detailed_data)
+
+# getting asmr data
+asmr_data <- read_excel(file_path, sheet = "Table_7", skip = 5) %>%
+  clean_names() %>%
+  filter(!is.na(week_number)) %>%
+  mutate(
+    week_number = as.integer(week_number),
+    asmr_per_100_000 = as.numeric(asmr_per_100_000),
+    lower_confidence_limit = as.numeric(lower_confidence_limit),
+    upper_confidence_limit = as.numeric(upper_confidence_limit)
+  ) %>%
+  filter(!is.na(asmr_per_100_000))
+
+# for simplicity, we'll add approximate week endings based on week numbers
+# week 42 in 2025 ends around October 17
+asmr_data <- asmr_data %>%
+  mutate(
+    # approximate calculation: assuming week 1 starts early January
+    year = 2025,
+    week_ending = as.Date("2025-01-03") + weeks(week_number - 1)
+  )
+
+ojs_define(asmr_data_raw = asmr_data)
+
+# calculate registration delay metrics
+# delay = registrations minus occurrences (registered deaths that occurred in earlier weeks)
+delay_data <- df1 %>%
+  filter(
+    age_group_years == "All ages",
+    sex == "All people",
+    area_of_usual_residence == "England, Wales and non-residents",
+    imd_quantile_group == "All groups",
+    place_of_occurrence == "All places"
+  ) %>%
+  select(week_number, week_ending, registrations = number_of_deaths) %>%
+  left_join(
+    df2 %>%
+      filter(
+        age_group_years == "All ages",
+        sex == "All people",
+        area_of_usual_residence == "England, Wales and non-residents",
+        imd_quantile_group == "All groups",
+        place_of_occurrence == "All places"
+      ) %>%
+      select(week_number, occurrences = number_of_deaths),
+    by = "week_number"
+  ) %>%
+  mutate(
+    delay_deaths = registrations - occurrences,
+    delay_percentage = (delay_deaths / registrations) * 100,
+    week_ending_str = as.character(week_ending)
+  ) %>%
+  filter(!is.na(delay_deaths))
+
+ojs_define(delay_data_raw = delay_data)
+```
+
+
+
+
+# Overview
+
+## Row {height="50%"}
+
+### Column {width="30%"}
+
+::: {.card .filter-card}
+::: {.card-header style="font-size: 1.4em;"}
+**About**
+:::
+::: {.card-body style="font-size: 1.4em;"}
+**Overview**
+
+This prototype data explorer tool provides provisional weekly death statistics for England and Wales from the Office for National Statistics (2025 onwards).
+
+A death occurrence is the date someone has died. A death registration is when that death is registered. The time it takes for a death to be registered can vary for multiple reasons. Currently, mortality statistics are registration-based.
+
+An [official dashboard](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/articles/deathsregisteredweeklyinenglandandwales/2025-03-26) is also available, and [further information](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/methodologies/userguidetomortalitystatisticsjuly2017) here.
+
+Any feedback or enquiries can be directed to health.data@ons.gov.uk
+:::
+:::
+
+### Column {width="70%"}
+
+::: {.card}
+::: {.card-header style="font-size: 1.4em;"}
+**Time Series (2025 onwards)**
+:::
+::: {.card-body}
+```{ojs}
+// label: ojs-setup (filters and shared data)
+// echo: false
+
+// 
+// OJS's `require` method loads the specified version of plotly in the browser.
+// here we pin a version so behaviour doesn't unexpectedly change if there is an update
+// to the package
+
+Plotly = require("https://cdn.plot.ly/plotly-2.27.0.min.js")
+
+// `death_data` is provided by the earlier R chunk which we passed into OJS via `ojs_define()`.
+// `transpose()` essentially turns a "column-oriented" table into a row-wise array of objects.
+death_data_raw = transpose(death_data)
+
+// parse dates and numbers
+
+
+/* IMPORTANT: parse and normalise fields
+   - JavaScript treats spreadsheet values as strings by default
+   - so we convert the week ending to a Date, numeric fields to numbers, etc...
+   - this keeps the rest of the code simpler and avoids type bugs.
+*/
+death_data_parsed = death_data_raw.map(d => ({
+  series: d.series, //registrations
+  week_ending: new Date(d.week_ending_str), // date object for plotly 
+  week_number: +d.week_number, // force number
+  area_of_usual_residence: d.area_of_usual_residence, // region name
+  sex: d.sex, // male /female
+  age_band: d.age_band,
+  age_order: +d.age_order, // ordering key from R
+  number_of_deaths: +d.number_of_deaths // once again force number
+}))
+
+// unique values
+unique_series  = ["Registrations", "Occurrences"]
+unique_weeks   = Array.from(new Set(death_data_parsed.map(d => d.week_number))).sort((a,b)=>a-b)
+unique_regions = Array.from(new Set(death_data_parsed.map(d => d.area_of_usual_residence))).sort()
+unique_sex     = ["Male", "Female"]
+unique_ages    = ["0-14 years","15-44 years","45-64 years","65-74 years","75-84 years","85+ years"]
+
+// colours - hex codes copied from ons website
+color_primary   = "#003C57"
+color_secondary = "#a8bd3a"
+color_accent    = "#00a3a6"
+color_warning   = "#206095"
+
+// logic to switch colour based on sex selection
+
+current_sex_color = {
+  // if both are selected (length 2) or nothing selected (length 0), use default
+  if (selected_sex.length === 2 || selected_sex.length === 0) {
+    return color_primary; 
+  } 
+  // if only Male is selected
+  else if (selected_sex.includes("Male")) {
+    return "#206095";
+  } 
+  // if only Female is selected
+  else {
+    return "#00a3a6";
+  }
+}
+
+
+
+
+
+// create the default state: automatically show latest week selected for bar charts.
+// we compute the most recent week number and use it as the default selection.
+// NOTE: This affects the bar charts (which read from `filtered_data` below).
+latestWeek = d3.max(unique_weeks)
+
+// built-in inputs
+// these create reactive controls. When a user touches  a filter, these controls change the plot.
+//  dependent cells re-run automatically
+viewof selected_series = Inputs.radio(unique_series, { label: html`Data Type`, value: "Registrations" })
+viewof selected_sex    = Inputs.checkbox(unique_sex,   { label: html`Sex`, value: unique_sex })
+
+// default to the latest week ONLY
+//viewof selected_weeks  = Inputs.select(
+//  unique_weeks,
+//  { label: html`Week Numbers`, multiple: true, value: [latestWeek], size: 8 }
+//)
+
+viewof selected_weeks  = Inputs.select(
+  unique_weeks,
+  // Remove {multiple: true, size: 8} from the options object
+  // Set the value directly to the single latestWeek number
+  { label: html`Week Numbers`, value: latestWeek } 
+)
+
+
+
+
+/* shared filtered data for bar charts
+   here we filter by:
+   - selected series (Registrations vs Occurrences),
+   - the currently selected week or weeks,
+   - selected sex (Male/Female).
+   The time-series chart does NOT use this because 
+   that line needs to show all weeks by default.
+*/
+
+//filtered_data = death_data_parsed.filter(d =>
+//  d.series === selected_series &&
+//  selected_weeks.includes(d.week_number) &&
+//  selected_sex.includes(d.sex)
+//)
+
+filtered_data = death_data_parsed.filter(d =>
+  d.series === selected_series &&
+  // MODIFIED: Use strict equality (== or ===) because selected_weeks is a single number, not an array
+  d.week_number === selected_weeks && 
+  selected_sex.includes(d.sex)
+)
+// format a date as "17 Oct 2025" and ensure UK style
+formatWeekEnding = date =>
+  date?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) ?? "–"
+
+
+// for the chart titles find the latest week-ending date present in the current selection.
+// if multiple weeks are selected, this picks the most recent to show in the title
+selected_week_end_date =
+  (filtered_data.length
+    ? d3.max(filtered_data, d => d.week_ending)
+    : null)
+
+selected_week_title = `Week ending ${formatWeekEnding(selected_week_end_date)}`
+
+// dynamic titles for selected sex 
+
+// Determine sex label for title
+sexTitle = (() => {
+  if (selected_sex.length === 2 || selected_sex.length === 0) {
+    return "";
+  } else if (selected_sex.includes("Male")) {
+    return "(Male)";
+  } else {
+    return "(Female)";
+  }
+})();
+
+
+
+
+// label: timeseries-chart
+
+{
+  // build a dataset that that IGNORES selected_weeks so TS always shows all weeks
+  const ts_rows = death_data_parsed.filter(d =>
+    d.series === selected_series &&
+    selected_sex.includes(d.sex)
+  );
+
+  // aggregate by week (sum over all selected sexes)
+  let ts_map = d3.rollup(
+    ts_rows,
+    v => d3.sum(v, d => d.number_of_deaths),
+    d => d.week_ending.toISOString()
+  );
+  let ts_array = Array.from(ts_map, ([date, deaths]) => ({ date: new Date(date), deaths }))
+                      .sort((a,b) => a.date - b.date);
+  if (selected_series === "Occurrences" && ts_array.length > 0) ts_array = ts_array.slice(0, -1);
+
+  const trace = {
+    x: ts_array.map(d => d.date),
+    y: ts_array.map(d => d.deaths),
+    type: 'scatter',
+    mode: 'lines+markers',
+    name: selected_series,
+    marker: { size: 8, color: selected_series === "Registrations" ? current_sex_color : color_secondary },
+    line:   { width: 4, color: selected_series === "Registrations" ? current_sex_color : color_secondary },
+    hovertemplate: 'Week ending: %{x|%d %b %Y}<br>Deaths: %{y:,.0f}<extra></extra>'
+  };
+
+  const div = (this && this.style) ? this : DOM.element('div');
+  // hard-stop any transient overflow inside the card
+  div.style.width = '100%';
+  div.style.height = '100%';
+  div.style.overflow = 'hidden';
+
+  // measure the container and pin the layout size to integer pixels
+  const rect = div.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+
+  const layout = {
+    title: { text: `<b>Weekly Deaths - ${selected_series} ${sexTitle}</b>`,
+             font: { size: 16, color: '#333', family: 'Open Sans, Arial, sans-serif' }, x: 0, xanchor: 'left' },
+    xaxis: { title: { text: 'Week ending', font: { size: 16 }, standoff: 70 }, showgrid: true, gridcolor: '#f0f0f0' },
+    yaxis: { title: { text: 'Number of Deaths', font: { size: 16 }, standoff: 100 }, showgrid: true, gridcolor: '#f0f0f0', tickformat: ',d' },
+    plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
+    margin: { l: 80, t: 60, r: 20, b: 40 },
+    autosize: false,  // <— stop automatic size pass
+    width: w,         // <— exact pixel width
+    height: h        // <— exact pixel height
+  };
+
+  const config = { displayModeBar: false, responsive: true };
+
+  Plotly.react(div, [trace], layout, config);
+
+  // keep responsiveness: if the card resizes, update the plot size to the new integer pixels
+  if (!div._ro) {
+    div._ro = new ResizeObserver(entries => {
+      const cr = entries[0].contentRect;
+      Plotly.relayout(div, { width: Math.floor(cr.width), height: Math.floor(cr.height) });
+    });
+    div._ro.observe(div);
+  }
+
+  return div;
+}
+
+
+
+```
+:::
+:::
+
+## Row {height="50%"}
+
+### Column {width="20%"}
+
+::: {.card .filter-card}
+::: {.card-header style="font-size: 1.4em;"}
+**Chart Filters**
+:::
+::: {.card-body style="padding: 0.8rem !important;"}
+
+```{ojs}
+// simply show the controls defined above (they are already reactive globals)
+
+// removing ${viewof selected_ages}`
+html`${viewof selected_series}
+${viewof selected_sex}
+${viewof selected_weeks}`
+
+
+// 
+```
+:::
+:::
+
+### Column {width="40%"}
+
+::: {.card}
+::: {.card-header style="font-size: 1.4em;"}
+**Deaths by Region**
+:::
+::: {.card-body}
+```{ojs}
+// label: regional-chart
+// regional totals from filtered_data (now week-filtered)
+regional_totals = d3.rollup(filtered_data, v => d3.sum(v, d => d.number_of_deaths), d => d.area_of_usual_residence)
+regional_array  = Array.from(regional_totals, ([region, deaths]) => ({ region, deaths }))
+                      .sort((a, b) => b.deaths - a.deaths)
+
+{
+  const trace = {
+    y: regional_array.map(d => d.region),
+    x: regional_array.map(d => d.deaths),
+    type: 'bar', orientation: 'h',
+    marker: { color: current_sex_color, line: { color: '#333', width: 1 } },
+    hovertemplate: '%{y}<br>Deaths: %{x:,.0f}<extra></extra>'
+  };
+
+  const div = (this && this.style) ? this : DOM.element('div');
+  div.style.width = '100%';
+  div.style.height = '100%';
+  div.style.overflow = 'hidden';
+
+  const rect = div.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+
+  const layout = {
+    title: { text: `<b>${selected_series} for ${selected_week_title} ${sexTitle} (Week ${selected_weeks})</b>`, x: 0, xanchor: 'left' },
+    xaxis: { title: { text: 'Number of Deaths', font: { size: 16 } }, showgrid: true, gridcolor: '#f0f0f0' },
+    yaxis: { title: '', automargin: false },     // <— pin margins to avoid relayout jumps
+    margin: { t: 40, b: 40, l: 150, r: 60 },
+    plot_bgcolor: '#ffffff', paper_bgcolor: '#ffffff',
+    autosize: false, width: w, height: h
+  };
+
+  const config = { displayModeBar: false, responsive: true };
+
+  Plotly.react(div, [trace], layout, config);
+
+  if (!div._ro) {
+    div._ro = new ResizeObserver(entries => {
+      const cr = entries[0].contentRect;
+      Plotly.relayout(div, { width: Math.floor(cr.width), height: Math.floor(cr.height) });
+    });
+    div._ro.observe(div);
+  }
+
+  return div;
+}
+
+
+```
+:::
+:::
+
+### Column {width="40%"}
+
+::: {.card}
+::: {.card-header style="font-size: 1.4em;"}
+**Deaths by Age and Sex**
+:::
+::: {.card-body}
+```{ojs}
+// label: age-sex-pyramid
+
+// this function extracts the first number found in an age-band label such as
+// "45-64 years". we return that number so we can sort age bands from young
+// to old in a consistent way. If a number cannot be found it is pushed to the end
+age_order_key = age => {
+  const m = /(\d+)/.exec(age || "");
+  return m ? +m[1] : Number.POSITIVE_INFINITY;
+}
+
+
+
+// determine the order of age bands on the Y axis.
+// if a global list `unique_ages` exists (defined elsewhere), use that order;
+// otherwise, derive the distinct set of age bands from the current data and
+// sort them using the numeric key above (youngest first).
+ordered_ages = (typeof unique_ages !== "undefined" && Array.isArray(unique_ages) && unique_ages.length)
+  ? unique_ages.slice()
+  : Array.from(new Set((filtered_data || []).map(d => d.age_band))).sort((a,b) => age_order_key(a) - age_order_key(b))
+
+
+// we aggregate deaths by age band and sex for the current selection.
+// `filtered_data` already applies the filters (series, sex, and the selected week).
+
+age_sex_pyramid_data = {
+  // defensive default: if filtered_data is missing then fall back to an empty array.
+  const rows = filtered_data || [];
+  
+  
+  // d3.rollup essentially groups rows first by age band, then by sex, and sums deaths
+  // the result is a nested map:  Map(age_band -> Map(sex -> total_deaths))
+  const rolled = d3.rollup(rows, v => d3.sum(v, d => +(d.number_of_deaths || 0)), d => d.age_band, d => d.sex);
+  
+  
+  // now we populate two arrays for plotly:
+  //   - `male` with negative values (so bars appear on the left),
+  //   - `female` with positive values (bars to the right)
+  // here also "track" totals to compute percentages in tooltips
+  
+  const displayLabel = age => age.replace('-', ' to ');
+  const order = ordered_ages;
+  const male = []; const female = [];
+  let total = 0; const totalBySex = new Map([["Male",0],["Female",0]]);
+  
+  
+  // now loop through age bands in display order and pull out male/female totals
+  for (const age of order) {
+    // get the inner map for this age band, or an empty one if absent
+    const bySex = rolled.get(age) || new Map();
+    const m = +(bySex.get("Male") || 0);
+    const f = +(bySex.get("Female") || 0);
+    
+    // update totals used for percentage calculations
+    total += (m+f);
+    totalBySex.set("Male", totalBySex.get("Male") + m);
+    totalBySex.set("Female", totalBySex.get("Female") + f);
+    male.push({ age, value: -m, abs: m });
+    female.push({ age, value:  f, abs: f });
+  }
+  return { order, male, female, total, totalBySex };
+}
+
+
+{
+  const { order, male, female, total, totalBySex } = age_sex_pyramid_data;
+
+  const div = (this && this.style) ? this : DOM.element('div');
+  div.style.width = '100%';
+  div.style.height = '100%';
+  div.style.overflow = 'hidden';
+
+  // Early exit remains unchanged
+  const maxAbs = Math.max(
+    d3.max(male, d => d?.abs || 0) || 0,
+    d3.max(female, d => d?.abs || 0) || 0
+  );
+  if (!order.length || maxAbs === 0) {
+    div.innerHTML = "<div style='display:flex;align-items:center;justify-content:center;height:100%;color:#666;'><em>selection empty.</em></div>";
+    return div;
+  }
+  if (div.innerHTML.includes("selection empty")) div.innerHTML = "";
+
+  const niceMax = d3.ticks(0, maxAbs * 1.1, 5).slice(-1)[0] || maxAbs;
+  const posTicks = d3.ticks(0, niceMax, 5).slice(1);
+  const tickvals = [...posTicks.map(t => -t), 0, ...posTicks];
+  const ticktext = tickvals.map(v => d3.format(",d")(Math.abs(v)));
+
+  const mTotal = totalBySex.get("Male") || 0;
+  const fTotal = totalBySex.get("Female") || 0;
+  const mkCD = d => [d.abs, total ? (d.abs/total*100) : 0, mTotal ? (d.abs/mTotal*100) : 0];
+  const fkCD = d => [d.abs, total ? (d.abs/total*100) : 0, fTotal ? (d.abs/fTotal*100) : 0];
+  const displayLabel = age => age.replace('-', ' to ');
+
+  const maleTrace = {
+    y: order.map(displayLabel), x: male.map(d => d.value), customdata: male.map(mkCD),
+    name: "Male", type: "bar", orientation: "h", marker: { color: "#206095" },
+    hovertemplate: "%{y}<br>Male deaths: %{customdata[0]:,.0f}<br>Share of total: %{customdata[1]:.1f}%<br>Within male: %{customdata[2]:.1f}%<extra></extra>"
+  };
+  const femaleTrace = {
+    y: order.map(displayLabel), x: female.map(d => d.value), customdata: female.map(fkCD),
+    name: "Female", type: "bar", orientation: "h", marker: { color: "#00a3a6" },
+    hovertemplate: "%{y}<br>Female deaths: %{customdata[0]:,.0f}<br>Share of total: %{customdata[1]:.1f}%<br>Within female: %{customdata[2]:.1f}%<extra></extra>"
+  };
+
+  const rect = div.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+
+  const layout = {
+    title: { text: `<b>${selected_series} for ${selected_week_title} (Week ${selected_weeks})</b>`, x: 0, xanchor: 'left' },
+    barmode: "overlay",
+    xaxis: {
+      title: { text: 'Number of Deaths', font: { size: 16 } },
+      range: [-niceMax, niceMax],
+      tickvals, ticktext, zeroline: true, zerolinecolor: "#555", zerolinewidth: 1.5,
+      gridcolor: "rgba(0,0,0,0.06)"
+    },
+    yaxis: { title: "", categoryorder: "array", categoryarray: order.map(displayLabel), automargin: false },
+    legend: { orientation: "h", x: 0, y: 1.04, xanchor: 'right', yanchor: 'top' },
+    margin: { t: 40, b: 40, l: 120, r: 85 },
+    plot_bgcolor: "rgba(0,0,0,0)",
+    paper_bgcolor: "rgba(0,0,0,0)",
+    autosize: false, width: w, height: h
+  };
+
+  const config = { displayModeBar: false, responsive: true };
+  Plotly.react(div, [maleTrace, femaleTrace], layout, config);
+
+  if (!div._ro) {
+    div._ro = new ResizeObserver(entries => {
+      const cr = entries[0].contentRect;
+      Plotly.relayout(div, { width: Math.floor(cr.width), height: Math.floor(cr.height) });
+    });
+    div._ro.observe(div);
+  }
+
+  return div;
+}
+
+```
+:::
+:::
