@@ -6,4 +6,4 @@ This data explorer tool allows users to investigate breakdowns of weekly deaths 
 
 A death occurrence is the date someone has died. A death registration is when that death was registered. The time it takes for a death to be registered can vary for multiple reasons. Currently, most published mortality statistics are registration-based. 
 
-An official dashboard is also available, and further information here. 
+For more information please see the [Weekly Deaths Dashboard](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/articles/deathsregisteredweeklyinenglandandwales/2025-03-26) and [user guide](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/methodologies/userguidetomortalitystatisticsjuly2017) on the ONS website
