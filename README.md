@@ -1,8 +1,6 @@
 This repository is for creating the Weekly deaths explorer tool which is hosted on GitHub Pages. 
 
-This prototype data explorer tool provides provisional weekly death statistics for England and Wales from the Office for National Statistics (2025 onwards). The data used in this dashboard is available on the ONS website: [Deaths registered weekly in England and Wales, provisional] 
-
-(https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales) 
+This prototype data explorer tool provides provisional weekly death statistics for England and Wales from the Office for National Statistics (2025 onwards). The data used in this dashboard is available on the ONS website: [Deaths registered weekly in England and Wales, provisional](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/weeklyprovisionalfiguresondeathsregisteredinenglandandwales) 
 
 This data explorer tool allows users to investigate breakdowns of weekly deaths by region, sex and age. It is a work in progress and further functionality will be added in the future. 
 
