@@ -12,35 +12,35 @@ html, body {
   overflow-x: hidden;
 }
 
-
 /* ==========================================================================
    2. DASHBOARD & TITLES
    ========================================================================== */
 .navbar {
     background-color: #fff;
     color: #333;
+    padding-top: 0.6rem !important;
+    padding-bottom: 0.2rem !important;
+    padding-left: 0.6rem !important;
 }
-
-
-
-.navbar {
-  padding-top: 0.6rem !important;
-  padding-bottom: 0.2rem !important;
-  padding-left: 0.6rem !important;
-}
-
 
 .navbar-title {
   font-size: 1.9em !important;
   font-weight: 900;
   padding-top: 5px;
   padding-left: 40px;
+  color: #333 !important;
 }
 
 .navbar .nav-link {
   font-size: 1.25rem;
   font-weight: 600;
   padding: 0.95rem 1rem;
+  color: #333 !important;
+}
+
+.nav-link.active {
+  background-color: #f8f9fa !important;
+  margin-right: 0 !important;
 }
 
 .quarto-title-block {
@@ -73,51 +73,13 @@ html, body {
   padding: 0.5rem;
 }
 
-
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
-
-.navbar-title,
-.navbar .navbar-brand,
-.navbar .navbar-brand:visited {
-  color: #333 !important;
+.navbar .navbar-brand img {
+  margin-right: 0.95rem;
 }
-
-.navbar .nav-link,
-.navbar .nav-link:visited {
-  color: #333 !important;
-}
-
-.navbar .nav-link:hover,
-.navbar .nav-link:focus {
-  color: #333 !important;
-}
-
-
-.nav-link.active {
-  background-color: #f8f9fa !important;
-  margin-right: 0 !important;
-}
-
-
-.navbar .container,
-.navbar .container-fluid {
-  padding-top: 0.2rem !important;
-  padding-bottom: 0.2rem !important;
-}
-
-.navbar .navbar-nav {
-  margin-left: auto !important;   
-}
-
-.navbar .quarto-dashboard-nav,
-.navbar .quarto-navigation {
-  margin-left: auto !important;
-}
-
-
 
 /* ==========================================================================
    3. CARD SYSTEM & LAYOUT FIXES
@@ -146,39 +108,49 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden; 
+  overflow: visible; 
 }
 
+/* header styles */
 .card-header {
   font-size: 0.9rem;
   font-weight: 600;
-  padding: 0.5rem 0.8rem;
+  padding: 4px 0.5rem !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  min-height: 35px;
   background-color: #F5F5F5;
   border-bottom: 1px solid #F5F5F5;
   flex-shrink: 0;
+  line-height: 1.2;
 }
 
-
+/* Body Styles - TIGHT PADDING */
 .card-body {
-  padding: 0.3rem 0.2rem;
+  padding: 4px !important;
+  padding-top: 0px !important;
   font-size: 1em;
-  flex: 1;
+  flex: 1 1 auto; /* allow body to grow */
   display: flex;
   flex-direction: column;
   min-height: 0; 
-  overflow: hidden;
+  overflow: visible;
 }
 
-/* target the Quarto/OJS wrappers */
+
 .card-body > div,
 .cell-output-display,
-.observablehq {
-  flex: 1 1 0%; 
-  width: 100%;
-  min-height: 0;
+.observablehq,
+.js-plotly-plot, 
+.plot-container, 
+.plotly {
+  flex: 1 1 auto; /* grow to fill the flex parent */
+  width: 100% !important;
+  min-height: 0;  /* allow shrinking if needed */
   position: relative; 
   display: flex;
   flex-direction: column;
+  margin-bottom: 0 !important;
 }
 
 /* ==========================================================================
@@ -189,20 +161,47 @@ html, body {
 }
 
 .filter-card .card-body {
-  padding: 0.3rem;
+  padding: 0.5rem !important; 
   overflow: visible !important;
-  display: block;
-  height: auto;
+  display: block !important;
 }
 
+/* target the container of each filter */
 .filter-card .observablehq {
+  display: block !important;
+  width: 100% !important;
+  margin-bottom: 1rem !important; /* space between each filter */
   border: none;
-  background: transparent;
-  box-shadow: none;
   padding: 0;
-  margin: 0 0 1rem 0;
-  flex: none; /* dont't stretch filters */
-  height: auto !important; 
+}
+
+/* TARGET ANY FORM INSIDE THE FILTER CARD */
+.filter-card form {
+  display: flex !important;
+  flex-direction: column !important; /* forces title on top and inputs below */
+  align-items: flex-start !important;
+  width: 100% !important;
+}
+
+/* force the title label to take up the full top row */
+.filter-card form > label {
+  display: block !important;
+  width: 100% !important;
+  margin-bottom: 4px !important; /* gap between title and buttons */
+  font-weight: 700 !important;
+  font-size: 0.9rem;
+  margin-right: 0 !important; /* remove default side margin */
+}
+
+/* force the input container (the buttons) to drop to the next line */
+.filter-card form > div,
+.filter-card form > select,
+.filter-card form > input {
+  display: flex !important;
+  flex-wrap: wrap !important; /* allow buttons to wrap if space is tight */
+  width: 100% !important;
+  margin-left: 0 !important;  /* reset default indentation */
+  gap: 0.5rem;                /* space between individual radio buttons */
 }
 
 /* hide debug tools */
@@ -213,27 +212,20 @@ button[aria-label*="collapse"] {
   display: none !important;
 }
 
-form.observablehq-form {
-  font-size: 0.85rem;
-  width: 100%;
-  padding: 0;
-}
-
-form.observablehq-form label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
 /* ==========================================================================
    5. RESPONSIVE
    ========================================================================== */
 @media (max-width: 992px) {
   .quarto-title-block .title { font-size: 1.4rem; }
-  .card-header { font-size: 0.85rem; padding: 0.35rem 0.6rem; }
-  .card-body { padding: 0.4rem 0.6rem; }
+  
+  .page-rows-contents > .dashboard-page-row {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  
+  .card .card-body {
+    min-height: 260px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -247,7 +239,7 @@ form.observablehq-form label {
 }
 
 /* ==========================================================================
-   6. CLEANUP
+   6. CLEANUP & OVERRIDES
    ========================================================================== */
 .card-body .cell-output-display,
 .card-body .observablehq,
@@ -275,64 +267,23 @@ form.observablehq-form label {
   visibility: hidden !important;
 }
 
-
-.card-body > div,
-.card-body .cell-output-display,
-.card-body .observablehq {
-  max-width: 100%;
-}
-
-
-@media (max-width: 992px) {
-  .page-rows-contents > .dashboard-page-row {
-    height: auto !important;
-    min-height: unset;
-  }
-}
-
-
-
-/* --- allow charts to use the space they need --- */
-.card,
-.card-body {
-  overflow: visible; /* was hidden; enable hover labels & ticks to render */
-}
-
-/* plotly containers sometimes set overflow on inner wrappers; ensure visibility */
 .card-body .js-plotly-plot,
 .card-body .plotly,
 .card-body svg {
   overflow: visible !important;
 }
 
-/* --- makes rows fluid on narrow screens --- */
-@media (max-width: 992px) {
-  /* quarto adds inline heights for rows; override them on small screens */
-  .page-rows-contents > .dashboard-page-row {
-    height: auto !important;
-    min-height: 0 !important;
-  }
-  /* give cards a sensible minimum height so charts remain readable */
-  .card .card-body {
-    min-height: 260px;
-  }
-}
-
-/* use fluid spacing instead of fixed paddings */
 :root {
   --space-1: clamp(0.25rem, 1vw, 0.5rem);
-  --space-2: clamp(0.5rem, 1.6vw, 0.8rem);
-}
-.card-header { padding: var(--space-1) var(--space-2); }
-.card-body   { padding: var(--space-2); }
-
-
-
-/* reduce top padding just under card headers on chart cards */
-.card .card-body { padding-top: 0.4rem; }
-
-
-.navbar .navbar-brand img {
-  margin-right: 0.95rem;     /* increase/decrease to taste */
 }
 
+.card-header { 
+    padding-left: var(--space-1); 
+    padding-right: var(--space-1); 
+}
+
+/* explicit rule to kill any lingering padding overrides */
+.card:not(.filter-card) .card-body {
+    padding: 8px !important;
+    padding-top: 5px !important;
+}
